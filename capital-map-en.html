@@ -1,0 +1,811 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Capital Gravity Map — Oval Omens</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Jost:wght@300;400;500&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --ivory: #F7F6F2;
+    --steel: #7B9BAF;
+    --steel-light: #A8C0CF;
+    --steel-dark: #4A6B7D;
+    --ink: #1C1C1E;
+    --ink-mid: #4A4A4A;
+    --ink-light: #8A8A8A;
+    --accent: #C4A882;
+  }
+
+  body {
+    background: var(--ink);
+    font-family: 'Jost', 'Helvetica Neue', Arial, sans-serif;
+    color: var(--ivory);
+    min-height: 100vh;
+  }
+
+  .header {
+    padding: 48px 40px 32px;
+    border-bottom: 1px solid rgba(123,155,175,0.2);
+  }
+
+  .eyebrow {
+    font-family: 'Jost', 'Helvetica Neue', Arial, sans-serif;
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--steel);
+    margin-bottom: 16px;
+  }
+
+  .title {
+    font-family: 'Cormorant Garamond', Georgia, 'Times New Roman', serif;
+    font-size: clamp(28px, 4vw, 44px);
+    font-weight: 300;
+    line-height: 1.15;
+    color: #000000;
+    margin-bottom: 12px;
+  }
+
+  .title em { font-style: italic; color: var(--accent); }
+
+  .subtitle {
+    font-family: 'Jost', 'Helvetica Neue', Arial, sans-serif;
+    font-size: 13px;
+    font-weight: 300;
+    color: var(--ink-light);
+    letter-spacing: 0.03em;
+  }
+
+  .container {
+    display: grid;
+    grid-template-columns: 1fr 360px;
+    min-height: calc(100vh - 140px);
+  }
+
+  .map-area {
+    position: relative;
+    background: #111214;
+    overflow: hidden;
+    border-right: 1px solid rgba(123,155,175,0.15);
+  }
+
+  svg.world {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+
+  .graticule {
+    fill: none;
+    stroke: rgba(123,155,175,0.06);
+    stroke-width: 0.5;
+  }
+
+  .land {
+    fill: #1E2128;
+    stroke: rgba(123,155,175,0.15);
+    stroke-width: 0.4;
+  }
+
+  .node { cursor: pointer; transition: all 0.25s ease; }
+
+  .node circle.pulse {
+    fill: none;
+    stroke-width: 1;
+    opacity: 0;
+  }
+
+  .node.active circle.pulse,
+  .node:hover circle.pulse {
+    opacity: 1;
+    animation: pulse 1.8s ease-out infinite;
+  }
+
+  @keyframes pulse {
+    0% { r: 8; opacity: 0.6; }
+    100% { r: 24; opacity: 0; }
+  }
+
+  .node circle.dot { transition: r 0.2s ease; }
+  .node:hover circle.dot { r: 9; }
+  .node.active circle.dot { r: 10; }
+
+  .node text {
+    font-family: 'Jost', sans-serif;
+    font-size: 8.5px;
+    font-weight: 400;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    fill: rgba(247,246,242,0.5);
+    pointer-events: none;
+    transition: fill 0.2s;
+  }
+
+  .node:hover text, .node.active text { fill: rgba(247,246,242,0.95); }
+
+  .flow-line {
+    fill: none;
+    stroke-dasharray: 4 3;
+    opacity: 0;
+    transition: opacity 0.4s ease;
+    animation: dash 3s linear infinite;
+  }
+
+  .flow-line.visible { opacity: 1; }
+
+  @keyframes dash { to { stroke-dashoffset: -28; } }
+
+  /* PANEL */
+  .panel {
+    padding: 36px 32px;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    max-height: calc(100vh - 140px);
+  }
+
+  .panel-default {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    flex: 1;
+    padding: 40px 0;
+  }
+
+  .panel-default p {
+    font-family: 'Cormorant Garamond', Georgia, 'Times New Roman', serif;
+    font-size: 18px;
+    font-weight: 300;
+    font-style: italic;
+    color: #000000;
+    line-height: 1.6;
+  }
+
+  .panel-content { display: none; flex-direction: column; gap: 22px; }
+  .panel-content.visible { display: flex; }
+
+  .region-name {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 30px;
+    font-weight: 300;
+    color: var(--ivory);
+    line-height: 1.1;
+    padding-bottom: 20px;
+    border-bottom: 1px solid rgba(123,155,175,0.2);
+  }
+
+  .region-name span {
+    display: block;
+    font-family: 'Jost', sans-serif;
+    font-size: 9px;
+    font-weight: 500;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--steel);
+    margin-bottom: 6px;
+  }
+
+  .section-label {
+    font-family: 'Jost', sans-serif;
+    font-size: 9px;
+    font-weight: 500;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--steel);
+    margin-bottom: 10px;
+  }
+
+  .tag-row { display: flex; flex-wrap: wrap; gap: 6px; }
+
+  .tag {
+    font-family: 'Jost', sans-serif;
+    font-size: 10px;
+    font-weight: 400;
+    letter-spacing: 0.04em;
+    padding: 4px 10px;
+    border-radius: 2px;
+    background: rgba(123,155,175,0.1);
+    color: var(--steel-light);
+    border: 1px solid rgba(123,155,175,0.2);
+  }
+
+  .tag.accent {
+    background: rgba(196,168,130,0.1);
+    color: var(--accent);
+    border-color: rgba(196,168,130,0.25);
+  }
+
+  .tag.dim {
+    background: rgba(74,74,74,0.2);
+    color: rgba(247,246,242,0.35);
+    border-color: rgba(74,74,74,0.3);
+  }
+
+  .stat-row { display: flex; flex-direction: column; gap: 10px; }
+
+  .stat { display: flex; align-items: baseline; gap: 10px; }
+
+  .stat-num {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 28px;
+    font-weight: 300;
+    color: var(--accent);
+    line-height: 1;
+    min-width: 60px;
+  }
+
+  .stat-desc {
+    font-family: 'Jost', sans-serif;
+    font-size: 11px;
+    font-weight: 300;
+    color: rgba(247,246,242,0.55);
+    line-height: 1.45;
+  }
+
+  .forecast-block {
+    background: rgba(123,155,175,0.06);
+    border-left: 2px solid var(--steel);
+    padding: 14px 16px;
+  }
+
+  .forecast-block p {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 15px;
+    font-weight: 400;
+    font-style: italic;
+    color: rgba(247,246,242,0.75);
+    line-height: 1.6;
+  }
+
+  .back-btn {
+    margin-top: auto;
+    padding-top: 24px;
+    font-family: 'Jost', sans-serif;
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ink-light);
+    cursor: pointer;
+    background: none;
+    border: none;
+    text-align: left;
+    transition: color 0.2s;
+  }
+
+  .back-btn:hover { color: var(--steel-light); }
+
+  .legend {
+    position: absolute;
+    bottom: 24px;
+    left: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: 'Jost', sans-serif;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: rgba(247,246,242,0.4);
+  }
+
+  .legend-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+  @media (max-width: 768px) {
+    .container { grid-template-columns: 1fr; grid-template-rows: 55vw 1fr; }
+    .map-area { border-right: none; border-bottom: 1px solid rgba(123,155,175,0.15); }
+    .panel { padding: 24px 20px; max-height: none; }
+    .header { padding: 28px 20px 20px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="eyebrow">Oval Omens — Capital Gravity Map</div>
+  <h1 class="title">Follow the <em>metal</em></h1>
+  <p class="subtitle">Where capital concentrates today — culture follows tomorrow. Select a region.</p>
+</div>
+
+<div class="container">
+  <div class="map-area">
+    <svg class="world" viewBox="0 0 900 500" xmlns="http://www.w3.org/2000/svg">
+
+      <g class="graticule">
+        <line x1="0" y1="125" x2="900" y2="125"/>
+        <line x1="0" y1="250" x2="900" y2="250"/>
+        <line x1="0" y1="375" x2="900" y2="375"/>
+        <line x1="225" y1="0" x2="225" y2="500"/>
+        <line x1="450" y1="0" x2="450" y2="500"/>
+        <line x1="675" y1="0" x2="675" y2="500"/>
+      </g>
+
+      <!-- North America -->
+      <path class="land" d="M80,60 L200,55 L230,80 L240,120 L220,160 L200,200 L170,230 L150,260 L130,240 L110,210 L90,180 L70,150 L60,120 L65,90 Z"/>
+      <path class="land" d="M150,260 L175,275 L165,295 L145,285 Z"/>
+      <!-- South America -->
+      <path class="land" d="M160,300 L210,295 L230,330 L220,380 L200,420 L175,440 L155,420 L140,380 L145,340 Z"/>
+      <!-- Europe -->
+      <path class="land" d="M390,60 L450,55 L470,75 L460,100 L440,110 L420,105 L400,90 L385,75 Z"/>
+      <path class="land" d="M410,40 L430,35 L440,55 L420,60 Z"/>
+      <!-- Africa -->
+      <path class="land" d="M400,130 L460,125 L490,155 L495,200 L480,250 L460,290 L440,310 L415,295 L395,260 L385,210 L388,165 Z"/>
+      <!-- Middle East -->
+      <path class="land" d="M470,110 L530,105 L545,130 L535,155 L510,160 L480,150 L465,135 Z"/>
+      <!-- Central Asia -->
+      <path class="land" d="M530,80 L620,75 L640,100 L630,125 L600,130 L560,125 L535,110 Z"/>
+      <!-- South Asia / India -->
+      <path class="land" d="M570,130 L625,125 L640,155 L630,185 L610,200 L585,195 L565,170 L558,145 Z"/>
+      <!-- Southeast Asia -->
+      <path class="land" d="M650,150 L710,145 L725,170 L715,195 L690,200 L660,190 L645,170 Z"/>
+      <path class="land" d="M680,210 L720,205 L730,220 L710,228 L675,225 Z"/>
+      <path class="land" d="M735,215 L760,210 L765,225 L745,230 Z"/>
+      <!-- East Asia / China -->
+      <path class="land" d="M680,80 L760,70 L790,95 L785,130 L760,145 L730,140 L700,125 L675,105 Z"/>
+      <!-- Korea peninsula -->
+      <path class="land" d="M778,100 L795,96 L800,112 L783,116 Z"/>
+      <!-- Japan -->
+      <path class="land" d="M810,88 L825,82 L835,98 L820,108 L808,100 Z"/>
+      <!-- Russia -->
+      <path class="land" d="M450,30 L700,20 L780,45 L790,70 L760,70 L680,80 L620,75 L530,80 L470,75 L450,55 Z"/>
+      <!-- Australia -->
+      <path class="land" d="M720,310 L800,300 L830,330 L825,375 L800,400 L760,405 L730,385 L715,355 L718,325 Z"/>
+      <!-- Mexico -->
+      <path class="land" d="M100,190 L155,185 L165,205 L155,225 L130,230 L105,215 Z"/>
+
+      <!-- Flow lines -->
+      <path class="flow-line" id="flow-ukraine-usa" stroke="#7B9BAF" stroke-width="1" d="M490,88 Q350,50 165,130"/>
+      <path class="flow-line" id="flow-me-usa" stroke="#C4A882" stroke-width="1" d="M505,128 Q350,80 165,130"/>
+      <path class="flow-line" id="flow-sea-usa" stroke="#7B9BAF" stroke-width="0.8" d="M685,170 Q500,100 165,130"/>
+      <path class="flow-line" id="flow-india-usa" stroke="#A8C0CF" stroke-width="0.8" d="M600,162 Q400,90 165,130"/>
+      <path class="flow-line" id="flow-japan-usa" stroke="#A8C0CF" stroke-width="0.8" d="M818,95 Q600,60 165,130"/>
+      <path class="flow-line" id="flow-mexico-usa" stroke="#7B9BAF" stroke-width="1" d="M130,208 Q148,175 165,130"/>
+
+      <!-- NODES -->
+
+      <!-- USA -->
+      <g class="node" data-id="usa" onclick="selectNode('usa')">
+        <circle class="pulse" cx="165" cy="130" r="8" stroke="#7B9BAF"/>
+        <circle class="dot" cx="165" cy="130" r="7" fill="#7B9BAF"/>
+        <text x="176" y="127">USA</text>
+      </g>
+
+      <!-- Ukraine -->
+      <g class="node" data-id="ukraine" onclick="selectNode('ukraine')">
+        <circle class="pulse" cx="490" cy="85" r="8" stroke="#C4A882"/>
+        <circle class="dot" cx="490" cy="85" r="6" fill="#C4A882"/>
+        <text x="499" y="82">Ukraine</text>
+      </g>
+
+      <!-- Middle East -->
+      <g class="node" data-id="me" onclick="selectNode('me')">
+        <circle class="pulse" cx="505" cy="128" r="8" stroke="#C4A882"/>
+        <circle class="dot" cx="505" cy="128" r="6" fill="#C4A882"/>
+        <text x="515" y="125">Middle East</text>
+      </g>
+
+      <!-- Southeast Asia -->
+      <g class="node" data-id="sea" onclick="selectNode('sea')">
+        <circle class="pulse" cx="685" cy="170" r="8" stroke="#A8C0CF"/>
+        <circle class="dot" cx="685" cy="170" r="6" fill="#A8C0CF"/>
+        <text x="695" y="167">SE Asia</text>
+      </g>
+
+      <!-- China -->
+      <g class="node" data-id="china" onclick="selectNode('china')">
+        <circle class="dot" cx="730" cy="108" r="6" fill="#383838" stroke="rgba(123,155,175,0.25)" stroke-width="1"/>
+        <text x="740" y="105">China</text>
+      </g>
+
+      <!-- Europe -->
+      <g class="node" data-id="europe" onclick="selectNode('europe')">
+        <circle class="pulse" cx="428" cy="82" r="8" stroke="#7B9BAF"/>
+        <circle class="dot" cx="428" cy="82" r="6" fill="#7B9BAF"/>
+        <text x="418" y="72" text-anchor="middle">Europe</text>
+      </g>
+
+      <!-- South Korea -->
+      <g class="node" data-id="korea" onclick="selectNode('korea')">
+        <circle class="pulse" cx="788" cy="108" r="8" stroke="#A8C0CF"/>
+        <circle class="dot" cx="788" cy="108" r="6" fill="#A8C0CF"/>
+        <text x="796" y="120" text-anchor="start">S. Korea</text>
+      </g>
+
+      <!-- Japan -->
+      <g class="node" data-id="japan" onclick="selectNode('japan')">
+        <circle class="pulse" cx="820" cy="95" r="8" stroke="#A8C0CF"/>
+        <circle class="dot" cx="820" cy="95" r="6" fill="#A8C0CF"/>
+        <text x="830" y="92">Japan</text>
+      </g>
+
+      <!-- India -->
+      <g class="node" data-id="india" onclick="selectNode('india')">
+        <circle class="pulse" cx="600" cy="162" r="8" stroke="#A8C0CF"/>
+        <circle class="dot" cx="600" cy="162" r="6" fill="#A8C0CF"/>
+        <text x="610" y="159">India</text>
+      </g>
+
+      <!-- Mexico -->
+      <g class="node" data-id="mexico" onclick="selectNode('mexico')">
+        <circle class="pulse" cx="130" cy="208" r="8" stroke="#7B9BAF"/>
+        <circle class="dot" cx="130" cy="208" r="6" fill="#7B9BAF"/>
+        <text x="100" y="222" text-anchor="middle">Mexico</text>
+      </g>
+
+    </svg>
+
+    <div class="legend">
+      <div class="legend-item">
+        <div class="legend-dot" style="background:#7B9BAF"></div>
+        Active recipient
+      </div>
+      <div class="legend-item">
+        <div class="legend-dot" style="background:#C4A882"></div>
+        Strategic source
+      </div>
+      <div class="legend-item">
+        <div class="legend-dot" style="background:#A8C0CF"></div>
+        Emerging center
+      </div>
+      <div class="legend-item">
+        <div class="legend-dot" style="background:#383838; border: 1px solid rgba(123,155,175,0.3)"></div>
+        Losing position
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-default" id="panel-default">
+      <p>Select a point on the map to see the investment profile and cultural forecast for each region.</p>
+    </div>
+
+    <!-- USA -->
+    <div class="panel-content" id="panel-usa">
+      <div class="region-name"><span>Region</span>United States</div>
+      <div>
+        <div class="section-label">Key sectors</div>
+        <div class="tag-row">
+          <span class="tag">Semiconductors</span>
+          <span class="tag">Data centers</span>
+          <span class="tag">AI infrastructure</span>
+          <span class="tag">EV</span>
+        </div>
+      </div>
+      <div class="stat-row">
+        <div class="stat">
+          <div class="stat-num">#1</div>
+          <div class="stat-desc">recipient of FDI in chip manufacturing since 2022</div>
+        </div>
+        <div class="stat">
+          <div class="stat-num">~50%</div>
+          <div class="stat-desc">of new data center announcements — US-sourced</div>
+        </div>
+        <div class="stat">
+          <div class="stat-num">75%</div>
+          <div class="stat-desc">of all major cross-border investments since 2022 flow into semiconductors, data centers, and EV</div>
+        </div>
+      </div>
+      <div>
+        <div class="section-label">Luxury & fashion signal</div>
+        <div class="tag-row">
+          <span class="tag accent">Dior Cruise 2027 — LA</span>
+          <span class="tag accent">LV Cruise 2027 — NY</span>
+          <span class="tag accent">Gucci Cruise 2027 — NY</span>
+          <span class="tag accent">Chanel Métiers d'Art — NY</span>
+        </div>
+      </div>
+      <div class="forecast-block">
+        <p>American aesthetics — its pragmatism, its loudness, its unapologetic relationship with money — will increasingly shape the global visual language of the next decade.</p>
+      </div>
+      <button class="back-btn" onclick="resetPanel()">← Back to map</button>
+    </div>
+
+    <!-- Ukraine -->
+    <div class="panel-content" id="panel-ukraine">
+      <div class="region-name"><span>Region</span>Ukraine</div>
+      <div>
+        <div class="section-label">Strategic resources</div>
+        <div class="tag-row">
+          <span class="tag">Lithium</span>
+          <span class="tag">Titanium</span>
+          <span class="tag">Graphite</span>
+          <span class="tag">Rare earth metals</span>
+          <span class="tag">Neon gas</span>
+        </div>
+      </div>
+      <div class="stat-row">
+        <div class="stat">
+          <div class="stat-num">Top 5</div>
+          <div class="stat-desc">global reserves of key minerals required for semiconductor production</div>
+        </div>
+      </div>
+      <div>
+        <div class="section-label">Key event</div>
+        <div class="tag-row">
+          <span class="tag accent">Ukraine–US Mineral Resources Agreement, 2025</span>
+        </div>
+      </div>
+      <div class="forecast-block">
+        <p>The minerals agreement is not a humanitarian gesture. It is a contract for access to the raw materials without which American technological dominance is impossible.</p>
+      </div>
+      <button class="back-btn" onclick="resetPanel()">← Back to map</button>
+    </div>
+
+    <!-- Middle East -->
+    <div class="panel-content" id="panel-me">
+      <div class="region-name"><span>Region</span>Middle East</div>
+      <div>
+        <div class="section-label">Key sectors</div>
+        <div class="tag-row">
+          <span class="tag">AI infrastructure</span>
+          <span class="tag">Energy</span>
+          <span class="tag">Cultural institutions</span>
+          <span class="tag">Hospitality</span>
+          <span class="tag">Sport & media</span>
+        </div>
+      </div>
+      <div class="stat-row">
+        <div class="stat">
+          <div class="stat-num">↑</div>
+          <div class="stat-desc">Saudi Arabia and UAE — largest new investors in AI infrastructure outside the US and Europe</div>
+        </div>
+      </div>
+      <div>
+        <div class="section-label">Cultural signals</div>
+        <div class="tag-row">
+          <span class="tag accent">Riyadh Fashion Week</span>
+          <span class="tag accent">Louvre Abu Dhabi</span>
+          <span class="tag accent">Formula 1, LIV Golf</span>
+        </div>
+      </div>
+      <div class="forecast-block">
+        <p>This is not philanthropy — it is soft power construction by the same logic Korea used. The next major cultural exporter is being assembled here, sector by sector.</p>
+      </div>
+      <button class="back-btn" onclick="resetPanel()">← Back to map</button>
+    </div>
+
+    <!-- Southeast Asia -->
+    <div class="panel-content" id="panel-sea">
+      <div class="region-name"><span>Region</span>Southeast Asia</div>
+      <div>
+        <div class="section-label">Key sectors</div>
+        <div class="tag-row">
+          <span class="tag">Chip manufacturing</span>
+          <span class="tag">Textiles</span>
+          <span class="tag">EV components</span>
+          <span class="tag">Digital economy</span>
+        </div>
+      </div>
+      <div class="stat-row">
+        <div class="stat">
+          <div class="stat-num">↑</div>
+          <div class="stat-desc">Vietnam and Indonesia absorbing manufacturing capacity relocated from China</div>
+        </div>
+      </div>
+      <div>
+        <div class="section-label">The precedent</div>
+        <div class="tag-row">
+          <span class="tag accent">The Korean model</span>
+        </div>
+      </div>
+      <div class="forecast-block">
+        <p>South Korea became a source of global trends not because it had great fashion — but because manufacturing money arrived, a new middle class emerged, and began exporting its aesthetic. This process is now starting here.</p>
+      </div>
+      <button class="back-btn" onclick="resetPanel()">← Back to map</button>
+    </div>
+
+    <!-- China -->
+    <div class="panel-content" id="panel-china">
+      <div class="region-name"><span>Region</span>China</div>
+      <div>
+        <div class="section-label">Status</div>
+        <div class="tag-row">
+          <span class="tag dim">Losing position</span>
+        </div>
+      </div>
+      <div class="stat-row">
+        <div class="stat">
+          <div class="stat-num">−80%</div>
+          <div class="stat-desc">of FDI in semiconductor manufacturing since 2022</div>
+        </div>
+      </div>
+      <div class="forecast-block">
+        <p>China remains the largest consumer market, but is losing its role as the center of capital investment in technological infrastructure. Luxury brands are reading this signal — and adjusting their geography accordingly.</p>
+      </div>
+      <button class="back-btn" onclick="resetPanel()">← Back to map</button>
+    </div>
+
+    <!-- Europe -->
+    <div class="panel-content" id="panel-europe">
+      <div class="region-name"><span>Region</span>Europe</div>
+      <div>
+        <div class="section-label">Key sectors</div>
+        <div class="tag-row">
+          <span class="tag">Data centers</span>
+          <span class="tag">EV</span>
+          <span class="tag">Green energy</span>
+        </div>
+      </div>
+      <div class="stat-row">
+        <div class="stat">
+          <div class="stat-num">#1</div>
+          <div class="stat-desc">largest recipient of new data center announcements globally</div>
+        </div>
+      </div>
+      <div class="forecast-block">
+        <p>Europe receives infrastructure but is losing cultural initiative. The great houses keep production at home while moving their shows to America — acknowledging where attention now lives.</p>
+      </div>
+      <button class="back-btn" onclick="resetPanel()">← Back to map</button>
+    </div>
+
+    <!-- South Korea -->
+    <div class="panel-content" id="panel-korea">
+      <div class="region-name"><span>Region</span>South Korea</div>
+      <div>
+        <div class="section-label">Key sectors</div>
+        <div class="tag-row">
+          <span class="tag">Semiconductors</span>
+          <span class="tag">Memory chips</span>
+          <span class="tag">Consumer electronics</span>
+          <span class="tag">Cultural export</span>
+        </div>
+      </div>
+      <div class="stat-row">
+        <div class="stat">
+          <div class="stat-num">Proven</div>
+          <div class="stat-desc">model: manufacturing investment → middle class → aesthetic export (K-pop, K-beauty, K-drama)</div>
+        </div>
+      </div>
+      <div>
+        <div class="section-label">The template</div>
+        <div class="tag-row">
+          <span class="tag accent">Samsung · SK Hynix</span>
+          <span class="tag accent">K-beauty global reach</span>
+          <span class="tag accent">Netflix K-drama dominance</span>
+        </div>
+      </div>
+      <div class="forecast-block">
+        <p>Korea is not the trend — Korea is the proof of concept. The question is not whether this model works. The question is where it activates next.</p>
+      </div>
+      <button class="back-btn" onclick="resetPanel()">← Back to map</button>
+    </div>
+
+    <!-- Japan -->
+    <div class="panel-content" id="panel-japan">
+      <div class="region-name"><span>Region</span>Japan</div>
+      <div>
+        <div class="section-label">Key sectors</div>
+        <div class="tag-row">
+          <span class="tag">Semiconductors</span>
+          <span class="tag">Advanced materials</span>
+          <span class="tag">Robotics</span>
+          <span class="tag">Chip equipment</span>
+        </div>
+      </div>
+      <div class="stat-row">
+        <div class="stat">
+          <div class="stat-num">↑</div>
+          <div class="stat-desc">TSMC building fabs in Kumamoto — Japan re-entering global chip supply chain after decades</div>
+        </div>
+      </div>
+      <div>
+        <div class="section-label">Cultural position</div>
+        <div class="tag-row">
+          <span class="tag accent">Quiet luxury aesthetics</span>
+          <span class="tag accent">Craft-driven design</span>
+        </div>
+      </div>
+      <div class="forecast-block">
+        <p>Japan's re-entry into semiconductor manufacturing reinforces its position as a precision-culture exporter. Expect renewed global interest in Japanese aesthetics — restraint, craft, material intelligence — as the investment story crystallizes.</p>
+      </div>
+      <button class="back-btn" onclick="resetPanel()">← Back to map</button>
+    </div>
+
+    <!-- India -->
+    <div class="panel-content" id="panel-india">
+      <div class="region-name"><span>Region</span>India</div>
+      <div>
+        <div class="section-label">Key sectors</div>
+        <div class="tag-row">
+          <span class="tag">Tech services</span>
+          <span class="tag">Semiconductor assembly</span>
+          <span class="tag">Digital infrastructure</span>
+          <span class="tag">Textiles</span>
+        </div>
+      </div>
+      <div class="stat-row">
+        <div class="stat">
+          <div class="stat-num">1.4B</div>
+          <div class="stat-desc">population — fastest-growing luxury consumer base after US and Europe</div>
+        </div>
+        <div class="stat">
+          <div class="stat-num">↑</div>
+          <div class="stat-desc">Apple, Samsung relocating production; chip assembly investments accelerating</div>
+        </div>
+      </div>
+      <div class="forecast-block">
+        <p>India is at the early stage of the Korea arc. Manufacturing investment is arriving, a tech middle class is expanding. The aesthetic export moment has not yet happened — which means it is worth watching closely now.</p>
+      </div>
+      <button class="back-btn" onclick="resetPanel()">← Back to map</button>
+    </div>
+
+    <!-- Mexico -->
+    <div class="panel-content" id="panel-mexico">
+      <div class="region-name"><span>Region</span>Mexico</div>
+      <div>
+        <div class="section-label">Key sectors</div>
+        <div class="tag-row">
+          <span class="tag">Nearshoring</span>
+          <span class="tag">EV manufacturing</span>
+          <span class="tag">Electronics assembly</span>
+          <span class="tag">Automotive</span>
+        </div>
+      </div>
+      <div class="stat-row">
+        <div class="stat">
+          <div class="stat-num">↑↑</div>
+          <div class="stat-desc">largest beneficiary of US nearshoring shift — absorbing supply chains exiting China</div>
+        </div>
+        <div class="stat">
+          <div class="stat-num">Border</div>
+          <div class="stat-desc">proximity to the US market makes Mexico a strategic manufacturing buffer in any tariff scenario</div>
+        </div>
+      </div>
+      <div class="forecast-block">
+        <p>Mexico's manufacturing boom is creating new industrial cities and a new industrial class. The cultural consequences — in music, in dress, in visual identity — are already visible at the edges. Watch the border cities.</p>
+      </div>
+      <button class="back-btn" onclick="resetPanel()">← Back to map</button>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  const flowMap = {
+    usa: ['flow-ukraine-usa','flow-me-usa','flow-sea-usa','flow-india-usa','flow-japan-usa','flow-mexico-usa'],
+    ukraine: ['flow-ukraine-usa'],
+    me: ['flow-me-usa'],
+    sea: ['flow-sea-usa'],
+    india: ['flow-india-usa'],
+    japan: ['flow-japan-usa'],
+    mexico: ['flow-mexico-usa'],
+  };
+
+  function selectNode(id) {
+    document.querySelectorAll('.node').forEach(n => n.classList.remove('active'));
+    document.querySelectorAll('.panel-content').forEach(p => p.classList.remove('visible'));
+    document.querySelectorAll('.flow-line').forEach(l => l.classList.remove('visible'));
+    document.getElementById('panel-default').style.display = 'none';
+
+    const node = document.querySelector(`[data-id="${id}"]`);
+    if (node) node.classList.add('active');
+
+    const panel = document.getElementById(`panel-${id}`);
+    if (panel) panel.classList.add('visible');
+
+    (flowMap[id] || []).forEach(fid => {
+      const el = document.getElementById(fid);
+      if (el) el.classList.add('visible');
+    });
+  }
+
+  function resetPanel() {
+    document.querySelectorAll('.node').forEach(n => n.classList.remove('active'));
+    document.querySelectorAll('.panel-content').forEach(p => p.classList.remove('visible'));
+    document.querySelectorAll('.flow-line').forEach(l => l.classList.remove('visible'));
+    document.getElementById('panel-default').style.display = 'flex';
+  }
+</script>
+</body>
+</html>
